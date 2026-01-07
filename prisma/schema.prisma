@@ -1,0 +1,123 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  EXPIRED
+}
+
+enum Role {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  CASHIER
+}
+
+model Tenant {
+  id                 String             @id @default(uuid())
+  name               String
+  email              String             @unique
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  vatEnabled         Boolean            @default(false)
+  currency           String             @default("NGN") // Storing currency code (e.g. NGN)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  users     User[]
+  products  Product[]
+  sales     Sale[]
+  auditLogs AuditLog[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  password  String
+  role      Role       @default(TENANT_ADMIN)
+  tenantId  String
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+model Product {
+  id                     String    @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant    @relation(fields: [tenantId], references: [id])
+  name                   String
+  costPrice              Int // stored in Kobo (e.g., 100 for 1 NGN)
+  salePrice              Int // stored in Kobo
+  stockLevel             Int
+  unit                   String    @default("UNIT") // New: KG, UNIT, LITRE, etc.
+  isVatExempt            Boolean   @default(false)
+  expiryDate             DateTime?
+  batchNumber            String?
+  isPrescriptionRequired Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  saleItems SaleItem[]
+
+  @@index([tenantId, updatedAt])
+  @@map("products")
+}
+
+model Sale {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  tenant              Tenant   @relation(fields: [tenantId], references: [id])
+  totalAmount         Int // Final payable amount in Kobo
+  subtotal            Int // Amount before VAT in Kobo
+  vatAmount           Int // VAT amount in Kobo
+  clientTransactionId String   @unique @default(uuid()) // Idempotency key
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt // Added for Sync Delta
+
+  items SaleItem[]
+
+  @@unique([tenantId, clientTransactionId])
+  @@index([tenantId, createdAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id                String  @id @default(uuid())
+  saleId            String
+  sale              Sale    @relation(fields: [saleId], references: [id])
+  productId         String
+  product           Product @relation(fields: [productId], references: [id])
+  quantity          Int
+  recordedCostPrice Int // Cost price at the time of sale
+  recordedSalePrice Int // Sale price at the time of sale
+
+  @@map("sale_items")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}
