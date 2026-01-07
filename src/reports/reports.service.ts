@@ -18,10 +18,13 @@ export class ReportsService {
       where: { tenantId, role: Role.CASHIER },
     });
 
-    // 3. Low Stock Products (< 10 units)
-    const lowStockCount = await this.prisma.product.count({
-      where: { tenantId, stockLevel: { lte: 10 } },
-    });
+    // 3. Low Stock Products (stockLevel <= minStockLevel)
+    const lowStockResult = await this.prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::int as count FROM products 
+      WHERE "tenantId" = ${tenantId} 
+      AND "stockLevel" <= "minStockLevel";
+    `;
+    const lowStockCount = lowStockResult[0]?.count || 0;
 
     // 4. Recent Sales (Last 5)
     const recentSales = await this.prisma.sale.findMany({

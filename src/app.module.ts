@@ -13,9 +13,10 @@ import { AdminModule } from './admin/admin.module';
 import { UsersModule } from './users/users.module';
 import { AuditModule } from './audit/audit.module';
 import { ReportsModule } from './reports/reports.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, ProductsModule, SalesModule, SubscriptionModule, SyncModule, AdminModule, UsersModule, AuditModule, ReportsModule],
+  imports: [PrismaModule, AuthModule, ProductsModule, SalesModule, SubscriptionModule, SyncModule, AdminModule, UsersModule, AuditModule, ReportsModule, InventoryModule],
   controllers: [AppController, AnalyticsController],
   providers: [AppService, AnalyticsService],
 })

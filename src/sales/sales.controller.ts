@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, UseInterceptors } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateSaleReturnDto } from './dto/create-sale-return.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SubscriptionGuard } from '../subscription/subscription.guard';
@@ -25,5 +26,16 @@ export class SalesController {
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req) {
     return this.salesService.findOne(id, req.user.tenantId);
+  }
+
+  @Post(':id/return')
+  returnSale(@Param('id') id: string, @Body() createSaleReturnDto: CreateSaleReturnDto, @Request() req) {
+    return this.salesService.returnSale(
+      id,
+      req.user.tenantId,
+      req.user.userId,
+      createSaleReturnDto.items,
+      createSaleReturnDto.reason,
+    );
   }
 }

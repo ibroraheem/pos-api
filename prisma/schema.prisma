@@ -32,24 +32,29 @@ model Tenant {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  users     User[]
-  products  Product[]
-  sales     Sale[]
-  auditLogs AuditLog[]
+  users            User[]
+  products         Product[]
+  sales            Sale[]
+  auditLogs        AuditLog[]
+  suppliers        Supplier[]
+  purchaseOrders   PurchaseOrder[]
+  stockAdjustments StockAdjustment[]
+  saleReturns      SaleReturn[]
 
   @@map("tenants")
 }
 
 model User {
-  id        String     @id @default(uuid())
-  email     String     @unique
-  password  String
-  role      Role       @default(TENANT_ADMIN)
-  tenantId  String
-  tenant    Tenant     @relation(fields: [tenantId], references: [id])
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  auditLogs AuditLog[]
+  id               String            @id @default(uuid())
+  email            String            @unique
+  password         String
+  role             Role              @default(TENANT_ADMIN)
+  tenantId         String
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  auditLogs        AuditLog[]
+  stockAdjustments StockAdjustment[]
 
   @@map("users")
 }
@@ -62,6 +67,7 @@ model Product {
   costPrice              Int // stored in Kobo (e.g., 100 for 1 NGN)
   salePrice              Int // stored in Kobo
   stockLevel             Int
+  minStockLevel          Int       @default(10) // Alert threshold
   unit                   String    @default("UNIT") // New: KG, UNIT, LITRE, etc.
   isVatExempt            Boolean   @default(false)
   expiryDate             DateTime?
@@ -70,7 +76,9 @@ model Product {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  saleItems SaleItem[]
+  saleItems          SaleItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  stockAdjustments   StockAdjustment[]
 
   @@index([tenantId, updatedAt])
   @@map("products")
@@ -87,7 +95,8 @@ model Sale {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt // Added for Sync Delta
 
-  items SaleItem[]
+  items   SaleItem[]
+  returns SaleReturn[]
 
   @@unique([tenantId, clientTransactionId])
   @@index([tenantId, createdAt])
@@ -120,4 +129,74 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@map("audit_logs")
+}
+
+model Supplier {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id         String              @id @default(uuid())
+  tenantId   String
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  supplierId String
+  supplier   Supplier            @relation(fields: [supplierId], references: [id])
+  totalCost  Int // in Kobo
+  status     String // PENDING, COMPLETED, CANCELLED
+  items      PurchaseOrderItem[]
+  createdAt  DateTime            @default(now())
+  receivedAt DateTime?
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  quantity        Int
+  unitCost        Int // Cost per unit in Kobo at time of purchase
+
+  @@map("purchase_order_items")
+}
+
+model StockAdjustment {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int // Positive (found stock) or Negative (shrinkage, damaged)
+  reason    String // DAMAGED, EXPIRED, FOUND, THEFT, OTHER
+  userId    String // Who made the adjustment
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@map("stock_adjustments")
+}
+
+model SaleReturn {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  saleId       String
+  sale         Sale     @relation(fields: [saleId], references: [id])
+  reason       String
+  refundAmount Int // in Kobo
+  items        String // JSON string of returned items: [{ productId, quantity }]
+  createdAt    DateTime @default(now())
+
+  @@map("sale_returns")
 }
